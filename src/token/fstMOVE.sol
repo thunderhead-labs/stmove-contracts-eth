@@ -1,34 +1,34 @@
 // SPDX-License-Identifier: MIT
-// OpenZeppelin Contracts (last updated v5.1.0) (token/ERC20/ERC20.sol)
 
 pragma solidity ^0.8.20;
 
-import {IERC20} from "./IERC20.sol";
-import {IERC20Metadata} from "./extensions/IERC20Metadata.sol";
-import {Context} from "../../utils/Context.sol";
-import {IERC20Errors} from "../../interfaces/draft-IERC6093.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Context} from "@openzeppelin/contracts/utils/Context.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 /**
- * @dev Implementation of the {IERC20} interface.
+ * @dev Non-transferable and rebasing read-only ERC20 token
  */
-abstract contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
+contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
     mapping(address account => uint256) private _shares;
 
-    // Variables uesd for increasing user balances linearly over time
-    uint256 public lastShareRate;
-    uint256 public lastUpdateTime;
+	// Variables uesd for increasing user balances linearly over time
+	uint256 public lastShareRate;
+	uint256 public lastUpdateTime;
 
-    uint256 public futureShareRate;
-    uint256 public nextUpdateTime;
+	uint256 public nextShareRate;
+	uint256 public nextUpdateTime;
 
-    uint256 public BASE = 10 ** 18;
+	uint256 public BASE = 10 ** 18;
 
     uint256 private _totalSupply;
 
     string private _name;
     string private _symbol;
 
-    address public _lock;
+	address public _lock;
+	address public _gov;
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -36,28 +36,40 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(string memory name_, string memory symbol_, address lock_) {
+    constructor(string memory name_, string memory symbol_, address lock_, address gov_) {
         _name = name_;
         _symbol = symbol_;
-        _lock = lock_;
+		_lock = lock_;
+		_gov = gov_;
     }
 
-    /**
-     * @dev Returns the current share rate based on the futureShareRate and the current progress of reaching nextUpdateTime
-     *
-     */
-    function shareRate() public view virtual returns (uint256) {
-        return (futureShareRate - lastShareRate) * BASE
-            / ((block.timestamp - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
-    }
+	/**
+	 * @dev Returns the current share rate based on the nextShareRate and the current progress of reaching nextUpdateTime
+	 **/
+	function shareRate() public view virtual returns (uint256) {
+		return (nextShareRate - lastShareRate) * BASE / ((block.timestamp - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
+	}
 
-    function sharesToAssets(uint256 shares) public view virtual returns (uint256) {
-        return shares * shareRate() / BASE;
-    }
+	/**
+	 * @dev Helper function that returns the share rate at a previous block (must be in between the last two updates)
+	 **/
+	function shareRate(uint256 time) public view virtual returns {
+		return (nextShareRate - lastShareRate) * BASE / ((time - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
+	}
 
-    function assetsToShares(uint256 assets) public view virtual returns (uint256) {
-        return assets * BASE / shareRate();
-    }
+	/**
+	 * @dev convert base shares to assets (shares -> fstMOVE balance).
+	 **/
+	function sharesToAssets(uint256 shares) public view virtual returns (uint256) {
+		return shares * shareRate() / BASE;
+	}
+
+	/**
+	 * @dev convert assets (fstMOVE) to underlying shares
+	 **/
+	function assetsToShares(uint256 assets) public view virtual returns (uint256) {
+		return assets * BASE / shareRate();
+	}
 
     /**
      * @dev Returns the name of the token.
@@ -74,12 +86,12 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
         return _symbol;
     }
 
-    /**
-     * @dev Returns the address of the permissioned lock contract
-     */
-    function lock() public view virtual returns (address) {
-        return _lock;
-    }
+	/**
+	 * @dev Returns the address of the permissioned lock contract
+	 */
+	function lock() public view virtual returns (address) {
+		return _lock;
+	}
 
     /**
      * @dev Returns the number of decimals used to get its user representation.
@@ -164,32 +176,45 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
         _update(address(0), account, value);
     }
 
-    /**
-     * @dev Mint assets worth of shares to account
-     */
-    function mintAssets(address account, uint256 value) external {
-        require(msg.sender == _lock, "mints can only be executed from lock contract");
+	/**
+	 * @dev Mint assets worth of shares to account
+	 */
+	function mintAssets(address account, uint256 value) external {
+		require(msg.sender == _lock, "mints can only be executed from lock contract");
 
-        _mint(account, assetsToShares(value));
+		_mint(account, assetsToShares(value));
+	}
+
+	/**
+	 * @dev Update next share rate
+	 */
+	function rebase(uint256 nextShareRate_, uint256 nextUpdateTime_) external {
+		require(msg.sender == _gov, "rebases must be executed by gov");
+
+		lastShareRate = nextShareRate;
+		lastUpdateTime = nextUpdateTime;
+		nextShareRate = nextShareRate_;
+		nextUpdateTime = nextUpdateTime_;
+	}
+
+
+	/**
+	  * Fulfill IERC20 interface
+	  **/
+
+    function transferFrom(address, address, uint256) public virtual returns (bool) {
+		revert("transferFrom not supported");
     }
 
-    /**
-     * Fulfill IERC20 interface
-     *
-     */
-    function transferFrom(address from, address to, uint256 value) public virtual returns (bool) {
-        revert("transferFrom not supported");
+    function transfer(address, uint256) public virtual returns (bool) {
+		revert("transferring not supported");
     }
 
-    function transfer(address to, uint256 value) public virtual returns (bool) {
-        revert("transferring not supported");
+    function allowance(address, address) public view virtual returns (uint256) {
+		return 0;
     }
 
-    function allowance(address owner, address spender) public view virtual returns (uint256) {
-        return 0;
-    }
-
-    function approve(address spender, uint256 value) public virtual returns (bool) {
-        revert("approvals not supported");
+    function approve(address, uint256) public virtual returns (bool) {
+		revert("approvals not supported");
     }
 }
