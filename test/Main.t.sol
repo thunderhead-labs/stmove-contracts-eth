@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
@@ -28,7 +30,7 @@ contract LockTest is Test {
 
         fstmove = new fstMOVE("future staked move", "fstmove", address(lock), address(this));
 
-        lock.initialize(address(fstmove), address(move), address(bridge));
+        lock.initialize(address(fstmove), address(move), address(bridge), address(this));
     }
 
     function testFuzz_Deposit(uint256 a, bytes32 b) public {
@@ -70,9 +72,13 @@ contract LockTest is Test {
             assertEq(fstmove.balanceOf(address(1)), a * y / 10 ** 18, "wrong fstmove balance; b");
         }
 
+        assertApproxEqAbs(fstmove.assetsToShares(fstmove.balanceOf(address(1))), a, 1, "assets to shares");
+        assertApproxEqAbs(fstmove.sharesToAssets(a), fstmove.balanceOf(address(1)), 1, "shares to assets");
+
         fstmove.rebase(f, t2);
         assertEq(fstmove.lastShareRate(), f);
         assertEq(fstmove.lastUpdateTime(), t2);
+        assertEq(fstmove.totalSupply(), fstmove.balanceOf(address(1)));
     }
 
     function testFail_Freeze() public {
@@ -108,5 +114,36 @@ contract LockTest is Test {
         lock.bridgeAndFreeze(d, 0, true);
         assertEq(bridge.transfers(d), a, "transfer did not go through");
         assertEq(lock.frozen(), true, "bridge did not freeze");
+    }
+
+    /**
+     * @notice fstMOVE additional test coverage
+     */
+    function test_Destruct() public {
+        testFuzz_Deposit(100, bytes32(0));
+
+        fstmove.destruct();
+        assertEq(fstmove.balanceOf(address(1)), 0);
+    }
+
+    function testFail_Transfer() public {
+        testFuzz_Deposit(100, bytes32(0));
+
+        vm.prank(address(1));
+        fstmove.transfer(address(2), 10);
+    }
+
+    function testFail_Approve() public {
+        testFuzz_Deposit(100, bytes32(0));
+
+        vm.prank(address(1));
+        fstmove.approve(address(2), 10);
+    }
+
+    function testFail_TransferFrom() public {
+        testFuzz_Deposit(100, bytes32(0));
+
+        vm.prank(address(1));
+        fstmove.transferFrom(address(1), address(2), 10);
     }
 }

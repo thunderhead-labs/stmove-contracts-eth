@@ -9,6 +9,13 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 
 /**
  * @dev Non-transferable and rebasing read-only ERC20 token
+ *
+ * This contract has a permissioned mintAssets function available to the designated lock contract (see ../Lock.sol)
+ *
+ * This contract has the ability to mint users a placeholder ERC20 token (that is read-only; non-transferable; non-approval; non-burnable) representing their deposit from the Lock contract.
+ * In order to increase user balances to reflect depositer APY, there is a share rate that is linearly increased to reach a target threshold at a certain time.
+ *
+ * The ability to rebase this contract or change the share rate to a different function is permissioned to the _gov address, defined when the contract is deployed.
  */
 contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     mapping(address account => uint256) private _shares;
@@ -96,13 +103,6 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     }
 
     /**
-     * @dev Returns the address of the permissioned lock contract
-     */
-    function lock() public view virtual returns (address) {
-        return _lock;
-    }
-
-    /**
      * @dev Returns the number of decimals used to get its user representation.
      * For example, if `decimals` equals `2`, a balance of `505` tokens should
      * be displayed to a user as `5.05` (`505 / 10 ** 2`).
@@ -124,6 +124,13 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      */
     function totalSupply() public view virtual returns (uint256) {
         return _totalSupply * shareRate() / BASE;
+    }
+
+    /**
+     * @dev Return the total number of shares ~ assetsToShares(totalSupply())
+     */
+    function totalShares() public view virtual returns (uint256) {
+        return _totalSupply;
     }
 
     /**
@@ -175,6 +182,7 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     }
 
     /**
+     * des
      * @dev Creates a `value` amount of tokens and assigns them to `account`, by transferring it from address(0).
      * Relies on the `_update` mechanism
      *
@@ -210,6 +218,13 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
         lastUpdateTime = nextUpdateTime;
         nextShareRate = nextShareRate_;
         nextUpdateTime = nextUpdateTime_;
+    }
+
+    /**
+     * @dev Destruct sets all balanceOf() calls to return 0 to prevent user wallet cloggage
+     */
+    function destruct() external {
+        destructed = true;
     }
 
     /**
