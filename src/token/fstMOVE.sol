@@ -224,7 +224,17 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      * @dev Destruct sets all balanceOf() calls to return 0 to prevent user wallet cloggage
      */
     function destruct() external {
+        require(msg.sender == _gov);
         destructed = true;
+    }
+
+    /**
+     * @dev Change gov role
+     */
+    function _changeGov(address newGov) external {
+        require(msg.sender == _gov);
+
+        _gov = newGov;
     }
 
     /**
