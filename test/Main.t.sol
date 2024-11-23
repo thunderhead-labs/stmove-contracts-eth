@@ -51,6 +51,9 @@ contract LockTest is Test {
         testFuzz_Deposit(a, bytes32(0));
 
         fstmove.rebase(f, t2);
+        assertEq(fstmove.nextShareRate(), f);
+        assertEq(fstmove.nextUpdateTime(), t2);
+
         uint256 t0 = block.timestamp + 1;
 
         vm.warp(t1);
@@ -68,5 +71,44 @@ contract LockTest is Test {
             assertEq(fstmove.shareRate(), y, "wrong share rate; b");
             assertEq(fstmove.balanceOf(address(1)), a * y / 10 ** 18, "wrong fstmove balance; b");
         }
+
+        fstmove.rebase(f, t2);
+        assertEq(fstmove.lastShareRate(), f);
+        assertEq(fstmove.lastUpdateTime(), t2);
+    }
+
+    function testFail_Freeze() public {
+        lock.freeze();
+
+        testFuzz_Deposit(10 ** 10, bytes32(0));
+    }
+
+    function testFuzz_Bridge(uint256 a, bytes32 b, uint256 c, bytes32 d) public {
+        a = bound(a, 0, 10 ** 40);
+        c = bound(c, 0, a);
+
+        testFuzz_Deposit(a, b);
+
+        lock.bridge(d, c, false);
+        assertEq(bridge.transfers(d), c, "transfer did not go through");
+    }
+
+    function testFuzz_BridgeMax(uint256 a, bytes32 b, bytes32 d) public {
+        a = bound(a, 0, 10 ** 40);
+
+        testFuzz_Deposit(a, b);
+
+        lock.bridge(d, 0, true);
+
+        assertEq(bridge.transfers(d), a, "transfer did not go through");
+    }
+
+    function testFuzz_BridgeAndFreeze(uint256 a, bytes32 b, bytes32 d) public {
+        a = bound(a, 0, 10 ** 40);
+        testFuzz_Deposit(a, b);
+
+        lock.bridgeAndFreeze(d, 0, true);
+        assertEq(bridge.transfers(d), a, "transfer did not go through");
+        assertEq(lock.frozen(), true, "bridge did not freeze");
     }
 }

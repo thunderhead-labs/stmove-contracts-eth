@@ -133,7 +133,7 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      * @dev See {IERC20-totalSupply}.
      */
     function totalSupply() public view virtual returns (uint256) {
-        return _totalSupply;
+        return _totalSupply * shareRate() / BASE;
     }
 
     /**
