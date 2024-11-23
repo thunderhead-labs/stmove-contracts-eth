@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
-import "forge-std/console.sol";
 
 /**
  * @dev Non-transferable and rebasing read-only ERC20 token
@@ -30,6 +29,8 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
 
     address public _lock;
     address public _gov;
+
+    bool destructed = false;
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -57,22 +58,11 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
             uint256 m = (nextShareRate - lastShareRate) * BASE / (nextUpdateTime - lastUpdateTime);
             uint256 b = lastShareRate;
 
-            console.log("SHARE RATE CALCULATION");
-            console.log(nextShareRate, block.timestamp, nextUpdateTime, lastUpdateTime);
             return m * (block.timestamp) / BASE + b;
         } else {
-            console.log("outside range", nextShareRate);
             return nextShareRate;
         }
     }
-
-    /**
-     * @dev Helper function that returns the share rate at a previous block (must be in between the last two updates)
-     *
-     */
-    //   function shareRate(uint256 time) public view virtual returns (uint256) {
-    //		return (nextShareRate - lastShareRate) * BASE / ((time - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
-    //   }
 
     /**
      * @dev convert base shares to assets (shares -> fstMOVE balance).
@@ -140,7 +130,10 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      * @dev See {IERC20-balanceOf}.
      */
     function balanceOf(address account) public view virtual returns (uint256) {
-        console.log(_shares[account], shareRate(), BASE);
+        if (destructed) {
+            return 0;
+        }
+
         return _shares[account] * shareRate() / BASE;
     }
 
