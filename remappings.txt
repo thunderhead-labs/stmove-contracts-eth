@@ -1,0 +1,16 @@
+lib/movement/protocol-units/bridge:@openzeppelin/contracts=lib/movement/protocol-units/bridge/contracts/lib/openzeppelin-contracts/contracts
+lib/movement/protocol-units/bridge:@openzeppelin/contracts-upgradeable=lib/movement/protocol-units/bridge/contracts/lib/openzeppelin-contracts-upgradeable/contracts
+
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+ds-test/=lib/openzeppelin-contracts/lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
+forge-std/=lib/forge-std/src/
+halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/
+movement/=lib/movement/
+murky/=lib/movement/protocol-units/settlement/mcr/contracts/lib/murky/
+openzeppelin-contracts-upgradeable/=lib/movement/protocol-units/bridge/contracts/lib/openzeppelin-contracts-upgradeable/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
+openzeppelin-foundry-upgrades/=lib/movement/protocol-units/settlement/mcr/contracts/lib/openzeppelin-foundry-upgrades/src/
+safe-smart-account/=lib/movement/protocol-units/settlement/mcr/contracts/lib/safe-smart-account/
+solidity-stringutils/=lib/movement/protocol-units/settlement/mcr/contracts/lib/openzeppelin-foundry-upgrades/lib/solidity-stringutils/
+solmate/=lib/movement/protocol-units/settlement/mcr/contracts/lib/solmate/src/
