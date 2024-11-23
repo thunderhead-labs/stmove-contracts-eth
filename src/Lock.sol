@@ -10,6 +10,7 @@ contract Lock is Initializable, OwnableUpgradeable {
     fstMOVE public fstmove;
     IERC20 public move;
     NativeBridge public movementBridge;
+    bool public frozen;
 
     mapping(bytes32 => uint256) public deposits;
 
@@ -23,7 +24,9 @@ contract Lock is Initializable, OwnableUpgradeable {
         movementBridge = NativeBridge(bridge_);
     }
 
-    function deposit(address to, uint256 amount, bytes32 moveAddress) external {
+    function deposit(address to, uint256 amount, bytes32 moveAddress) public {
+        require(!frozen, "lock period has ended");
+
         move.transferFrom(msg.sender, address(this), amount);
         fstmove.mintAssets(to, amount);
 
@@ -32,11 +35,20 @@ contract Lock is Initializable, OwnableUpgradeable {
         emit Deposit(to, amount, moveAddress);
     }
 
-    function bridge(bytes32 moveAddress, uint256 amount, bool max) external onlyOwner {
+    function bridge(bytes32 moveAddress, uint256 amount, bool max) public onlyOwner {
         if (max) {
             movementBridge.initiateBridgeTransfer(moveAddress, move.balanceOf(address(this)));
         } else {
             movementBridge.initiateBridgeTransfer(moveAddress, amount);
         }
+    }
+
+    function freeze() public onlyOwner {
+        frozen = true;
+    }
+
+    function bridgeAndFreeze(bytes32 moveAddress, uint256 amount, bool max) public onlyOwner {
+        freeze();
+        bridge(moveAddress, amount, max);
     }
 }

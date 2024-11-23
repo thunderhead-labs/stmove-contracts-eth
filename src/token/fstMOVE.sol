@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import "forge-std/console.sol";
 
 /**
  * @dev Non-transferable and rebasing read-only ERC20 token
@@ -13,14 +14,14 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     mapping(address account => uint256) private _shares;
 
+    uint256 public BASE = 10 ** 18;
+
     // Variables uesd for increasing user balances linearly over time
-    uint256 public lastShareRate;
+    uint256 public lastShareRate = 10 ** 18;
     uint256 public lastUpdateTime;
 
     uint256 public nextShareRate;
     uint256 public nextUpdateTime;
-
-    uint256 public BASE = 10 ** 18;
 
     uint256 private _totalSupply;
 
@@ -41,6 +42,10 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
         _symbol = symbol_;
         _lock = lock_;
         _gov = gov_;
+
+        lastUpdateTime = block.timestamp;
+        nextUpdateTime = block.timestamp + 1;
+        nextShareRate = BASE;
     }
 
     /**
@@ -48,18 +53,26 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      *
      */
     function shareRate() public view virtual returns (uint256) {
-        return (nextShareRate - lastShareRate) * BASE
-            / ((block.timestamp - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
+        if (block.timestamp < nextUpdateTime && lastUpdateTime < block.timestamp) {
+            uint256 m = (nextShareRate - lastShareRate) * BASE / (nextUpdateTime - lastUpdateTime);
+            uint256 b = lastShareRate;
+
+            console.log("SHARE RATE CALCULATION");
+            console.log(nextShareRate, block.timestamp, nextUpdateTime, lastUpdateTime);
+            return m * (block.timestamp) / BASE + b;
+        } else {
+            console.log("outside range", nextShareRate);
+            return nextShareRate;
+        }
     }
 
     /**
      * @dev Helper function that returns the share rate at a previous block (must be in between the last two updates)
      *
      */
-    function shareRate(uint256 time) public view virtual returns (uint256) {
-        return (nextShareRate - lastShareRate) * BASE
-            / ((time - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
-    }
+    //   function shareRate(uint256 time) public view virtual returns (uint256) {
+    //		return (nextShareRate - lastShareRate) * BASE / ((time - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
+    //   }
 
     /**
      * @dev convert base shares to assets (shares -> fstMOVE balance).
@@ -127,6 +140,7 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      * @dev See {IERC20-balanceOf}.
      */
     function balanceOf(address account) public view virtual returns (uint256) {
+        console.log(_shares[account], shareRate(), BASE);
         return _shares[account] * shareRate() / BASE;
     }
 
@@ -196,6 +210,8 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      */
     function rebase(uint256 nextShareRate_, uint256 nextUpdateTime_) external {
         require(msg.sender == _gov, "rebases must be executed by gov");
+        require(nextShareRate_ >= lastShareRate, "cannot negatively rebase");
+        require(nextUpdateTime_ >= lastUpdateTime, "update must be in the future");
 
         lastShareRate = nextShareRate;
         lastUpdateTime = nextUpdateTime;
