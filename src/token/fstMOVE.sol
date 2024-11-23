@@ -7,10 +7,11 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
+
 /**
  * @dev Non-transferable and rebasing read-only ERC20 token
  */
-contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
+contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     mapping(address account => uint256) private _shares;
 
 	// Variables uesd for increasing user balances linearly over time
@@ -53,7 +54,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
 	/**
 	 * @dev Helper function that returns the share rate at a previous block (must be in between the last two updates)
 	 **/
-	function shareRate(uint256 time) public view virtual returns {
+	function shareRate(uint256 time) public view virtual returns (uint256) {
 		return (nextShareRate - lastShareRate) * BASE / ((time - lastUpdateTime) * BASE / (nextUpdateTime - lastUpdateTime)) + lastShareRate;
 	}
 
