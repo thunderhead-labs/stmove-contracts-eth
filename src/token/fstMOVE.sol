@@ -90,7 +90,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
         }
         
 
-        uint256 rate = (nextShareRate_ - lastShareRate_) * block.timestamp / (updateEnd_ - updateStart_) + lastShareRate_;
+        uint256 rate = (nextShareRate_ - lastShareRate_) * (block.timestamp - updateStart_) / (updateEnd_ - updateStart_) + lastShareRate_;
 
         return rate;
     }
