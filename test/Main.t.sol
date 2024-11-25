@@ -52,7 +52,7 @@ contract LockTest is Test {
         assertEq(lock.designated(address(this)), b);
     }
 
-    function testFuzz_RebaseAndDeposit(uint256 a, uint256 f, uint256 t1, uint256 t2) public {
+    function testFuzz_2RebaseAndDeposit(uint256 a, uint256 f, uint256 t1, uint256 t2) public {
         f = bound(f, 10 ** 18, 10 ** 24);
         a = bound(a, 10 ** 18, 10 ** 40);
         t1 = bound(t1, 10, 10 ** 8);
@@ -65,19 +65,20 @@ contract LockTest is Test {
         testFuzz_Deposit(a, bytes32(0));
     }
 
-    function testFuzz_Rebase(uint256 a, uint256 f, uint256 t1, uint256 t2) public {
+    function testFuzz_Rebase(uint256 a, uint256 f, uint256 t0, uint256 t1, uint256 t2) public {
         f = bound(f, 10 ** 18, 10 ** 24);
         a = bound(a, 0, 10 ** 40);
         t1 = bound(t1, 10, 10 ** 8);
-        t2 = bound(t2, 10, 10 ** 8);
+        t0 = bound(t0, 10, t1);
+        t2 = bound(t2, t1, 10 ** 8);
 
         testFuzz_Deposit(a, bytes32(0));
 
+        vm.warp(t0);
+        fstmove.rebase(10 ** 18, t0);
         fstmove.rebase(f, t2);
         assertEq(fstmove.nextShareRate(), f);
         assertEq(fstmove.nextUpdateTime(), t2);
-
-        uint256 t0 = block.timestamp;
 
         vm.warp(t1);
 
@@ -90,7 +91,7 @@ contract LockTest is Test {
 
             uint256 m = (f - 10 ** 18) * 10 ** 18 / (t2 - t0);
             uint256 b = 10 ** 18;
-            uint256 y = (m * t1 / 10 ** 18) + b;
+            uint256 y = (m * (t1 - t0) / 10 ** 18) + b;
 
             assertEq(fstmove.shareRate(), y, "wrong share rate; b");
             assertEq(fstmove.balanceOf(address(this)), a * y / 10 ** 18, "wrong fstmove balance; b");

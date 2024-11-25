@@ -65,10 +65,14 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
         if (block.timestamp < nextUpdateTime && lastUpdateTime <= block.timestamp) {
             console.log("SHARE RATE CALC");
             console.log(nextShareRate, lastShareRate, nextUpdateTime, lastUpdateTime);
+            console.log(block.timestamp);
             uint256 m = (nextShareRate - lastShareRate) * BASE / (nextUpdateTime - lastUpdateTime);
+            console.log(nextShareRate - lastShareRate);
+            console.log(nextUpdateTime - lastUpdateTime);
             uint256 b = lastShareRate;
+            console.log(block.timestamp, b);
 
-            return m * (block.timestamp) / BASE + b;
+            return m * (block.timestamp - lastUpdateTime) / BASE + b;
         } else {
             return nextShareRate;
         }
