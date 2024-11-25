@@ -14,6 +14,18 @@ contract Move is ERC20 {
     }
 }
 
+
+function deployAll(address move, address bridge, address gov) returns (Lock lock, fstMOVE fstmove) {
+    Lock lock_ = new Lock();
+    lock = Lock(address(new TransparentUpgradeableProxy(address(lock_), gov, "")));
+
+    fstMOVE fstmove_ = new fstMOVE();
+    fstmove = fstMOVE(address(new TransparentUpgradeableProxy(address(fstmove_), gov, "")));
+
+    lock.initialize(address(fstmove), address(move), address(bridge), gov);
+    fstmove.initialize("Future Staked MOVE", "fstMOVE", address(lock), gov);
+}
+
 contract DeployScript is Script {
     NativeBridge bridge;
     Lock lock;
@@ -27,22 +39,17 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         move = new Move();
-        bridge = new NativeBridge();
+        bridge = new NativeBridge(address(move));
 
-        Lock lock_ = new Lock();
-        lock = Lock(address(new TransparentUpgradeableProxy(address(lock_), gov, "")));
-
-        fstmove = new fstMOVE("future staked move", "fstmove", address(lock), gov);
-
-        lock.initialize(address(fstmove), address(move), address(bridge), gov);
-
+        (Lock lock, fstMOVE fstmove) = deployAll(address(move), address(bridge), gov);
+        
         console.log("Move: ", address(move));
         console.log("fstmove: ", address(fstmove));
         console.log("Bridge: ", address(bridge));
         console.log("Lock: ", address(lock));
         console.log("Gov: ", gov);
 
-        fstmove.rebase(30 * (10 ** 18) / 10, block.timestamp + 365 days);
+        fstmove.rebaseByShareRate(30 * (10 ** 18) / 10, block.timestamp + 365 days);
 
         move.approve(address(lock), 100 * 10 ** 18);
         lock.deposit(100 * 10 ** 18, bytes32(0));

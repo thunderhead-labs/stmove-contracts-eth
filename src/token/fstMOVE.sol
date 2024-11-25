@@ -4,8 +4,9 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import "forge-std/console.sol";
 
 /**
  * @dev Non-transferable and rebasing read-only ERC20 token
@@ -17,58 +18,81 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
  *
  * The ability to rebase this contract or change the share rate to a different function is permissioned to the _gov address, defined when the contract is deployed.
  */
-contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
+contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAdminRulesUpgradeable  {
+
+    bytes32 public constant LOCK_ROLE = keccak256("LOCK_ROLE");
+
     mapping(address account => uint256) private _shares;
 
-    uint256 public BASE = 10 ** 18;
+    uint256 public BASE;
 
     // Variables uesd for increasing user balances linearly over time
-    uint256 public lastShareRate = 10 ** 18;
-    uint256 public lastUpdateTime;
+    uint256 public lastShareRate;
+    uint256 public updateStart;
 
     uint256 public nextShareRate;
-    uint256 public nextUpdateTime;
+    uint256 public updateEnd;
 
     uint256 private _totalSupply;
 
     string private _name;
     string private _symbol;
 
-    address public _lock;
-    address public _gov;
-
     bool destructed = false;
+
+    error TransferFromNotSupported();
+    error TransferNotSupported();
+    error ApprovalsNotSupported();
+    error NegativeRebaseNotAllowed();
+    error UpdateMustBeInFuture();
 
     /**
      * @dev Sets the values for {name} and {symbol}.
      *
      * All two of these values are immutable: they can only be set once during
      * construction.
-     */
-    constructor(string memory name_, string memory symbol_, address lock_, address gov_) {
+     */ 
+
+    constructor() {
+        _disableInitializers();
+    }
+    function initialize(string memory name_, string memory symbol_, address lock_, address gov_) public initializer {
         _name = name_;
         _symbol = symbol_;
-        _lock = lock_;
-        _gov = gov_;
 
-        lastUpdateTime = block.timestamp;
-        nextUpdateTime = block.timestamp + 1;
+        __AccessControlDefaultAdminRules_init(0, gov_);
+        _grantRole(LOCK_ROLE, lock_);
+
+        updateStart = block.timestamp;
+        updateEnd = block.timestamp;
+        BASE = 10**8;
+        lastShareRate = BASE;
         nextShareRate = BASE;
     }
 
     /**
-     * @dev Returns the current share rate based on the nextShareRate and the current progress of reaching nextUpdateTime
+     * @dev Returns the current share rate based on the nextShareRate and the current progress of reaching updateEnd
      *
      */
-    function shareRate() public view virtual returns (uint256) {
-        if (block.timestamp < nextUpdateTime && lastUpdateTime <= block.timestamp) {
-            uint256 m = (nextShareRate - lastShareRate) * BASE / (nextUpdateTime - lastUpdateTime);
-            uint256 b = lastShareRate;
+    function shareRate() public view returns (uint256) {
+        
+        uint256 updateEnd_ = updateEnd;
+        uint256 updateStart_ = updateStart;
+        uint256 nextShareRate_ = nextShareRate;
+        uint256 lastShareRate_ = lastShareRate;
 
-            return m * (block.timestamp - lastUpdateTime) / BASE + b;
-        } else {
-            return nextShareRate;
+        if (block.timestamp >= updateEnd_) {    
+            return nextShareRate_;
         }
+
+        if (block.timestamp <= updateStart_) {
+            return lastShareRate_;
+        }
+        
+
+        uint256 rate = (nextShareRate_ - lastShareRate_) * block.timestamp / (updateEnd_ - updateStart_) + lastShareRate_;
+
+        return rate;
     }
 
     /**
@@ -116,7 +140,7 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      * {IERC20-balanceOf} and {IERC20-transfer}.
      */
     function decimals() public view virtual returns (uint8) {
-        return 18;
+        return 8;
     }
 
     /**
@@ -203,8 +227,7 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     /**
      * @dev Mint assets worth of shares to account
      */
-    function mintAssets(address account, uint256 value) external {
-        require(msg.sender == _lock, "mints can only be executed from lock contract");
+    function mintAssets(address account, uint256 value) external onlyRole(LOCK_ROLE) {
 
         _mint(account, assetsToShares(value));
     }
@@ -214,40 +237,39 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     /**
      * @dev Update next share rate
      */
-    function rebase(uint256 nextShareRate_, uint256 nextUpdateTime_) external {
-        require(msg.sender == _gov, "rebases must be executed by gov");
-        require(nextShareRate_ >= lastShareRate, "cannot negatively rebase");
-        require(nextUpdateTime_ >= lastUpdateTime, "update must be in the future");
+    function rebaseByShareRate(uint256 nextShareRate_, uint256 updateEnd_) onlyRole(DEFAULT_ADMIN_ROLE) external {
+        if (nextShareRate_ < lastShareRate) revert NegativeRebaseNotAllowed();
+        if (updateEnd_ < block.timestamp) revert UpdateMustBeInFuture();
 
-        if (nextUpdateTime > block.timestamp) {
-            lastUpdateTime = block.timestamp;
-        } else {
-            lastUpdateTime = nextUpdateTime;
-        }
+        lastShareRate = shareRate();
+        updateStart = block.timestamp;
 
-        lastShareRate = nextShareRate;
+        updateEnd = updateEnd_;
         nextShareRate = nextShareRate_;
-        nextUpdateTime = nextUpdateTime_;
 
-        emit Rebase(nextShareRate, nextUpdateTime);
+        emit Rebase(nextShareRate_, updateEnd_);
+    }   
+
+    function rebaseByApr(uint256 apr, uint256 updateEnd_) onlyRole(DEFAULT_ADMIN_ROLE) external {
+        if (updateEnd_ < block.timestamp) revert UpdateMustBeInFuture();
+        
+        uint256 shareRateIncrease = apr * (updateEnd_ - block.timestamp) / 365 days;  
+        uint256 currentShareRate_ = shareRate();
+
+        lastShareRate = currentShareRate_;  
+        updateStart = block.timestamp;
+
+        updateEnd = updateEnd_;
+        nextShareRate = currentShareRate_ + shareRateIncrease;
+
+        emit Rebase(nextShareRate, updateEnd_);
     }
 
     /**
      * @dev Destruct sets all balanceOf() calls to return 0 to prevent user wallet cloggage
      */
-    function destruct(bool x) external {
-        require(msg.sender == _gov);
-
-        destructed = x;
-    }
-
-    /**
-     * @dev Change gov role
-     */
-    function _changeGov(address newGov) external {
-        require(msg.sender == _gov);
-
-        _gov = newGov;
+    function setDestruct(bool status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        destructed = status;
     }
 
     /**
@@ -255,11 +277,11 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      *
      */
     function transferFrom(address, address, uint256) public virtual returns (bool) {
-        revert("transferFrom not supported");
+        revert TransferFromNotSupported();
     }
 
     function transfer(address, uint256) public virtual returns (bool) {
-        revert("transferring not supported");
+        revert TransferNotSupported();
     }
 
     function allowance(address, address) public view virtual returns (uint256) {
@@ -267,6 +289,6 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     }
 
     function approve(address, uint256) public virtual returns (bool) {
-        revert("approvals not supported");
+        revert ApprovalsNotSupported();
     }
 }

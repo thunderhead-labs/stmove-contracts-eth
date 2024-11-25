@@ -32,6 +32,11 @@ contract Lock is Initializable, OwnableUpgradeable {
     event Deposit(address eth, uint256 amount, bytes32 moveAddress);
     event Redesignation(bytes32 oldAddress, bytes32 newAddress);
 
+    error LockPeriodEnded();
+
+    constructor() {
+        _disableInitializers();
+    }
     /**
      * @dev initialize contract variables and make gov_ the owner of this contract
      */
@@ -47,7 +52,9 @@ contract Lock is Initializable, OwnableUpgradeable {
      * @dev deposit function for any user to deposit move -> fstMOVE
      */
     function deposit(uint256 amount, bytes32 moveAddress) public {
-        require(!frozen, "lock period has ended");
+        if (frozen) {
+            revert LockPeriodEnded();
+        }
 
         move.transferFrom(msg.sender, address(this), amount);
         fstmove.mintAssets(msg.sender, amount);
@@ -61,7 +68,9 @@ contract Lock is Initializable, OwnableUpgradeable {
      * @dev Redesignate movement L2 address to receive the stMOVE
      */
     function redesignate(bytes32 moveAddress) public {
-        require(!frozen, "lock period has ended");
+        if (frozen) {
+            revert LockPeriodEnded();
+        }
 
         emit Redesignation(designated[msg.sender], moveAddress);
 
@@ -73,24 +82,19 @@ contract Lock is Initializable, OwnableUpgradeable {
      */
     function bridge(bytes32 moveAddress, uint256 amount, bool max) public onlyOwner {
         if (max) {
+            move.approve(address(movementBridge), move.balanceOf(address(this)));
             movementBridge.initiateBridgeTransfer(moveAddress, move.balanceOf(address(this)));
         } else {
+            move.approve(address(movementBridge), amount);
             movementBridge.initiateBridgeTransfer(moveAddress, amount);
         }
-    }
+    } 
 
     /**
      * @dev disable deposits
      */
-    function freeze() public onlyOwner {
-        frozen = true;
+    function setFreeze(bool status) public onlyOwner {
+        frozen = status;
     }
 
-    /**
-     * @dev briege tokens and freeze contract atomically
-     */
-    function bridgeAndFreeze(bytes32 moveAddress, uint256 amount, bool max) public onlyOwner {
-        freeze();
-        bridge(moveAddress, amount, max);
-    }
 }
