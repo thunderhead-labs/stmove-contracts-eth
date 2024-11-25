@@ -8,6 +8,7 @@ import "../src/token/fstMOVE.sol";
 import "../src/mock/NativeBridge.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "forge-std/console.sol";
 
 contract Move is ERC20 {
     constructor() ERC20("move", "move") {
@@ -37,11 +38,11 @@ contract LockTest is Test {
         a = bound(a, 0, 10 ** 40);
 
         move.approve(address(lock), a);
-        lock.deposit(address(1), a, b);
+        lock.deposit(a, b);
 
         assertEq(move.balanceOf(address(lock)), a);
-        assertEq(fstmove.balanceOf(address(1)), a);
-        assertEq(lock.deposits(b), a);
+        assertEq(fstmove.balanceOf(address(this)), a);
+        assertEq(lock.designated(address(this)), b);
     }
 
     function testFuzz_Rebase(uint256 a, uint256 f, uint256 t1, uint256 t2) public {
@@ -56,29 +57,37 @@ contract LockTest is Test {
         assertEq(fstmove.nextShareRate(), f);
         assertEq(fstmove.nextUpdateTime(), t2);
 
-        uint256 t0 = block.timestamp + 1;
+        uint256 t0 = block.timestamp;
 
         vm.warp(t1);
 
         if (t1 >= t2) {
             assertEq(fstmove.shareRate(), f, "wrong share rate; a");
-            assertEq(fstmove.balanceOf(address(1)), a * f / 10 ** 18, "wrong fstmove balance; a");
+            assertEq(fstmove.balanceOf(address(this)), a * f / 10 ** 18, "wrong fstmove balance; a");
         } else {
+            console.log("SHARE RATE CALC 2:");
+            console.log(f, 10 ** 18, t2, t0);
+
             uint256 m = (f - 10 ** 18) * 10 ** 18 / (t2 - t0);
             uint256 b = 10 ** 18;
             uint256 y = (m * t1 / 10 ** 18) + b;
 
             assertEq(fstmove.shareRate(), y, "wrong share rate; b");
-            assertEq(fstmove.balanceOf(address(1)), a * y / 10 ** 18, "wrong fstmove balance; b");
+            assertEq(fstmove.balanceOf(address(this)), a * y / 10 ** 18, "wrong fstmove balance; b");
         }
 
-        assertApproxEqAbs(fstmove.assetsToShares(fstmove.balanceOf(address(1))), a, 1, "assets to shares");
-        assertApproxEqAbs(fstmove.sharesToAssets(a), fstmove.balanceOf(address(1)), 1, "shares to assets");
+        assertApproxEqAbs(fstmove.assetsToShares(fstmove.balanceOf(address(this))), a, 1, "assets to shares");
+        assertApproxEqAbs(fstmove.sharesToAssets(a), fstmove.balanceOf(address(this)), 1, "shares to assets");
 
         fstmove.rebase(f, t2);
         assertEq(fstmove.lastShareRate(), f);
-        assertEq(fstmove.lastUpdateTime(), t2);
-        assertEq(fstmove.totalSupply(), fstmove.balanceOf(address(1)));
+        if (t2 > block.timestamp) {
+            assertEq(fstmove.lastUpdateTime(), block.timestamp);
+        } else {
+            assertEq(fstmove.lastUpdateTime(), t2);
+        }
+
+        assertEq(fstmove.totalSupply(), fstmove.balanceOf(address(this)));
     }
 
     function testFail_Freeze() public {
@@ -122,28 +131,31 @@ contract LockTest is Test {
     function test_Destruct() public {
         testFuzz_Deposit(100, bytes32(0));
 
-        fstmove.destruct();
-        assertEq(fstmove.balanceOf(address(1)), 0);
+        fstmove.destruct(true);
+        assertEq(fstmove.balanceOf(address(this)), 0);
+
+        fstmove.destruct(false);
+        assertEq(fstmove.balanceOf(address(this)), 100);
     }
 
     function testFail_Transfer() public {
         testFuzz_Deposit(100, bytes32(0));
 
-        vm.prank(address(1));
+        vm.prank(address(this));
         fstmove.transfer(address(2), 10);
     }
 
     function testFail_Approve() public {
         testFuzz_Deposit(100, bytes32(0));
 
-        vm.prank(address(1));
+        vm.prank(address(this));
         fstmove.approve(address(2), 10);
     }
 
     function testFail_TransferFrom() public {
         testFuzz_Deposit(100, bytes32(0));
 
-        vm.prank(address(1));
-        fstmove.transferFrom(address(1), address(2), 10);
+        vm.prank(address(this));
+        fstmove.transferFrom(address(this), address(2), 10);
     }
 }

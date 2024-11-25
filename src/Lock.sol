@@ -26,9 +26,10 @@ contract Lock is Initializable, OwnableUpgradeable {
     /**
      * @dev ledger of deposits for different move address (movement l2 address -> future stmove balance)
      */
-    mapping(bytes32 => uint256) public deposits;
+    mapping(address => bytes32) public designated;
 
     event Deposit(address eth, uint256 amount, bytes32 moveAddress);
+    event Redesignation(bytes32 oldAddress, bytes32 newAddress);
 
     /**
      * @dev initialize contract variables and make gov_ the owner of this contract
@@ -44,15 +45,26 @@ contract Lock is Initializable, OwnableUpgradeable {
     /**
      * @dev deposit function for any user to deposit move -> fstMOVE
      */
-    function deposit(address to, uint256 amount, bytes32 moveAddress) public {
+    function deposit(uint256 amount, bytes32 moveAddress) public {
         require(!frozen, "lock period has ended");
 
         move.transferFrom(msg.sender, address(this), amount);
-        fstmove.mintAssets(to, amount);
+        fstmove.mintAssets(msg.sender, amount);
 
-        deposits[moveAddress] += amount;
+        designated[msg.sender] = moveAddress;
 
-        emit Deposit(to, amount, moveAddress);
+        emit Deposit(msg.sender, amount, moveAddress);
+    }
+
+    /**
+     * @dev Redesignate movement L2 address to receive the stMOVE
+     */
+    function redesignate(bytes32 moveAddress) public {
+        require(!frozen, "lock period has ended");
+
+        emit Redesignation(designated[msg.sender], moveAddress);
+
+        designated[msg.sender] = moveAddress;
     }
 
     /**
