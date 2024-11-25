@@ -37,12 +37,32 @@ contract LockTest is Test {
     function testFuzz_Deposit(uint256 a, bytes32 b) public {
         a = bound(a, 0, 10 ** 40);
 
+        console.log(block.timestamp);
         move.approve(address(lock), a);
         lock.deposit(a, b);
 
+        console.log(block.timestamp);
+        console.log(fstmove.sharesOf(address(this)));
+        console.log(fstmove.assetsToShares(a));
+        console.log(fstmove.assetsToShares(fstmove.balanceOf(address(this))));
+
         assertEq(move.balanceOf(address(lock)), a);
-        assertEq(fstmove.balanceOf(address(this)), a);
+        assertApproxEqRel(fstmove.balanceOf(address(this)), a, 1e14);
+        assertLe(fstmove.balanceOf(address(this)), a);
         assertEq(lock.designated(address(this)), b);
+    }
+
+    function testFuzz_RebaseAndDeposit(uint256 a, uint256 f, uint256 t1, uint256 t2) public {
+        f = bound(f, 10 ** 18, 10 ** 24);
+        a = bound(a, 10 ** 18, 10 ** 40);
+        t1 = bound(t1, 10, 10 ** 8);
+        t2 = bound(t2, 10, 10 ** 8);
+
+        fstmove.rebase(f, t2);
+
+        vm.warp(t1);
+
+        testFuzz_Deposit(a, bytes32(0));
     }
 
     function testFuzz_Rebase(uint256 a, uint256 f, uint256 t1, uint256 t2) public {

@@ -41,5 +41,10 @@ contract DeployScript is Script {
         console.log("Bridge: ", address(bridge));
         console.log("Lock: ", address(lock));
         console.log("Gov: ", gov);
+
+        fstmove.rebase(30 * (10 ** 18) / 10, block.timestamp + 365 days);
+
+        move.approve(address(lock), 100 * 10 ** 18);
+        lock.deposit(100 * 10 ** 18, bytes32(0));
     }
 }

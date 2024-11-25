@@ -62,7 +62,7 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      *
      */
     function shareRate() public view virtual returns (uint256) {
-        if (block.timestamp < nextUpdateTime && lastUpdateTime < block.timestamp) {
+        if (block.timestamp < nextUpdateTime && lastUpdateTime <= block.timestamp) {
             console.log("SHARE RATE CALC");
             console.log(nextShareRate, lastShareRate, nextUpdateTime, lastUpdateTime);
             uint256 m = (nextShareRate - lastShareRate) * BASE / (nextUpdateTime - lastUpdateTime);
@@ -145,6 +145,10 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
         }
 
         return _shares[account] * shareRate() / BASE;
+    }
+
+    function sharesOf(address account) public view virtual returns (uint256) {
+        return _shares[account];
     }
 
     /**
