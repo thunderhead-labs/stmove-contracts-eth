@@ -13,7 +13,8 @@ import "./mock/NativeBridge.sol";
  *
  * This contract will receive assets from users and mint them a corresponding fstMOVE token (future-staked-move).
  *
- * This token does not have any value and is just a placeholder for users to see their APY increasing in their wallets, and the ledger that will be uploaded to the corresponding receiver contract on movement will accept the *deposits* mapping as the ledger.
+ * This token does not have any value and is just a placeholder for users to see their APY increasing in their wallets, and the ledger that will be uploaded
+ * to the corresponding receiver contract on movement will accept the *designated* mapping in tandem with fstMOVE balances as the ledger.
  *
  * Controlled by the owner of this contract, this contract can be frozen and all movement tokens can be bridged to any address on movement through their native bridge
  */

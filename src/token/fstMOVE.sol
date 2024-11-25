@@ -185,7 +185,6 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
     }
 
     /**
-     * des
      * @dev Creates a `value` amount of tokens and assigns them to `account`, by transferring it from address(0).
      * Relies on the `_update` mechanism
      *
