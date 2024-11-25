@@ -86,9 +86,6 @@ contract LockTest is Test {
             assertEq(fstmove.shareRate(), f, "wrong share rate; a");
             assertEq(fstmove.balanceOf(address(this)), a * f / 10 ** 18, "wrong fstmove balance; a");
         } else {
-            console.log("SHARE RATE CALC 2:");
-            console.log(f, 10 ** 18, t2, t0);
-
             uint256 m = (f - 10 ** 18) * 10 ** 18 / (t2 - t0);
             uint256 b = 10 ** 18;
             uint256 y = (m * (t1 - t0) / 10 ** 18) + b;

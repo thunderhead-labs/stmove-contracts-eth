@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
-import "forge-std/console.sol";
 
 /**
  * @dev Non-transferable and rebasing read-only ERC20 token
@@ -63,14 +62,8 @@ contract fstMOVE is Context, IERC20, IERC20Metadata, IERC20Errors {
      */
     function shareRate() public view virtual returns (uint256) {
         if (block.timestamp < nextUpdateTime && lastUpdateTime <= block.timestamp) {
-            console.log("SHARE RATE CALC");
-            console.log(nextShareRate, lastShareRate, nextUpdateTime, lastUpdateTime);
-            console.log(block.timestamp);
             uint256 m = (nextShareRate - lastShareRate) * BASE / (nextUpdateTime - lastUpdateTime);
-            console.log(nextShareRate - lastShareRate);
-            console.log(nextUpdateTime - lastUpdateTime);
             uint256 b = lastShareRate;
-            console.log(block.timestamp, b);
 
             return m * (block.timestamp - lastUpdateTime) / BASE + b;
         } else {
