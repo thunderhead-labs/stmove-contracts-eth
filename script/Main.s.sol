@@ -14,7 +14,6 @@ contract Move is ERC20 {
     }
 }
 
-
 function deployAll(address move, address bridge, address gov) returns (Lock lock, fstMOVE fstmove) {
     Lock lock_ = new Lock();
     lock = Lock(address(new TransparentUpgradeableProxy(address(lock_), gov, "")));
@@ -42,7 +41,7 @@ contract DeployScript is Script {
         bridge = new NativeBridge(address(move));
 
         (Lock lock, fstMOVE fstmove) = deployAll(address(move), address(bridge), gov);
-        
+
         console.log("Move: ", address(move));
         console.log("fstmove: ", address(fstmove));
         console.log("Bridge: ", address(bridge));

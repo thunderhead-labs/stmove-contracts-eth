@@ -72,7 +72,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
         lastShareRate = BASE;
         nextShareRate = BASE;
 
-        maxAprThreshold = 35*10**6;
+        maxAprThreshold = 35 * 10 ** 6;
     }
 
     /**

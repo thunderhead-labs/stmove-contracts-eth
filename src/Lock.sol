@@ -98,8 +98,7 @@ contract Lock is Initializable, OwnableUpgradeable {
         frozen = status;
     }
 
-
     function setMoveBridge(address bridge_) public onlyOwner {
         movementBridge = NativeBridge(bridge_);
-    }   
+    }
 }
