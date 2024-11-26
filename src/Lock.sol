@@ -40,6 +40,7 @@ contract Lock is Initializable, OwnableUpgradeable {
     /**
      * @dev initialize contract variables and make gov_ the owner of this contract
      */
+
     function initialize(address fstMOVE_, address move_, address bridge_, address gov_) public initializer {
         __Ownable_init(gov_);
 
@@ -88,7 +89,7 @@ contract Lock is Initializable, OwnableUpgradeable {
             move.approve(address(movementBridge), amount);
             movementBridge.initiateBridgeTransfer(moveAddress, amount);
         }
-    } 
+    }
 
     /**
      * @dev disable deposits
@@ -96,5 +97,4 @@ contract Lock is Initializable, OwnableUpgradeable {
     function setFreeze(bool status) public onlyOwner {
         frozen = status;
     }
-
 }

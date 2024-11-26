@@ -5,7 +5,8 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
-import {AccessControlDefaultAdminRulesUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import "forge-std/console.sol";
 
 /**
@@ -18,8 +19,7 @@ import "forge-std/console.sol";
  *
  * The ability to rebase this contract or change the share rate to a different function is permissioned to the _gov address, defined when the contract is deployed.
  */
-contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAdminRulesUpgradeable  {
-
+contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAdminRulesUpgradeable {
     bytes32 public constant LOCK_ROLE = keccak256("LOCK_ROLE");
 
     mapping(address account => uint256) private _shares;
@@ -51,11 +51,11 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
      *
      * All two of these values are immutable: they can only be set once during
      * construction.
-     */ 
-
+     */
     constructor() {
         _disableInitializers();
     }
+
     function initialize(string memory name_, string memory symbol_, address lock_, address gov_) public initializer {
         _name = name_;
         _symbol = symbol_;
@@ -65,7 +65,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
 
         updateStart = block.timestamp;
         updateEnd = block.timestamp;
-        BASE = 10**8;
+        BASE = 10 ** 8;
         lastShareRate = BASE;
         nextShareRate = BASE;
     }
@@ -75,22 +75,21 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
      *
      */
     function shareRate() public view returns (uint256) {
-        
         uint256 updateEnd_ = updateEnd;
         uint256 updateStart_ = updateStart;
         uint256 nextShareRate_ = nextShareRate;
         uint256 lastShareRate_ = lastShareRate;
 
-        if (block.timestamp >= updateEnd_) {    
+        if (block.timestamp >= updateEnd_) {
             return nextShareRate_;
         }
 
         if (block.timestamp <= updateStart_) {
             return lastShareRate_;
         }
-        
 
-        uint256 rate = (nextShareRate_ - lastShareRate_) * (block.timestamp - updateStart_) / (updateEnd_ - updateStart_) + lastShareRate_;
+        uint256 rate = (nextShareRate_ - lastShareRate_) * (block.timestamp - updateStart_)
+            / (updateEnd_ - updateStart_) + lastShareRate_;
 
         return rate;
     }
@@ -228,7 +227,6 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
      * @dev Mint assets worth of shares to account
      */
     function mintAssets(address account, uint256 value) external onlyRole(LOCK_ROLE) {
-
         _mint(account, assetsToShares(value));
     }
 
@@ -237,7 +235,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
     /**
      * @dev Update next share rate
      */
-    function rebaseByShareRate(uint256 nextShareRate_, uint256 updateEnd_) onlyRole(DEFAULT_ADMIN_ROLE) external {
+    function rebaseByShareRate(uint256 nextShareRate_, uint256 updateEnd_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (nextShareRate_ < lastShareRate) revert NegativeRebaseNotAllowed();
         if (updateEnd_ < block.timestamp) revert UpdateMustBeInFuture();
 
@@ -248,15 +246,15 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
         nextShareRate = nextShareRate_;
 
         emit Rebase(nextShareRate_, updateEnd_);
-    }   
+    }
 
-    function rebaseByApr(uint256 apr, uint256 updateEnd_) onlyRole(DEFAULT_ADMIN_ROLE) external {
+    function rebaseByApr(uint256 apr, uint256 updateEnd_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (updateEnd_ < block.timestamp) revert UpdateMustBeInFuture();
-        
-        uint256 shareRateIncrease = apr * (updateEnd_ - block.timestamp) / 365 days;  
+
+        uint256 shareRateIncrease = apr * (updateEnd_ - block.timestamp) / 365 days;
         uint256 currentShareRate_ = shareRate();
 
-        lastShareRate = currentShareRate_;  
+        lastShareRate = currentShareRate_;
         updateStart = block.timestamp;
 
         updateEnd = updateEnd_;
