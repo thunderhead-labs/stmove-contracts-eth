@@ -33,6 +33,8 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
     uint256 public nextShareRate;
     uint256 public updateEnd;
 
+    uint256 public maxAprThreshold;
+
     uint256 private _totalSupply;
 
     string private _name;
@@ -45,6 +47,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
     error ApprovalsNotSupported();
     error NegativeRebaseNotAllowed();
     error UpdateMustBeInFuture();
+    error AprTooHigh();
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -68,11 +71,12 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
         BASE = 10 ** 8;
         lastShareRate = BASE;
         nextShareRate = BASE;
+
+        maxAprThreshold = 35*10**6;
     }
 
     /**
      * @dev Returns the current share rate based on the nextShareRate and the current progress of reaching updateEnd
-     *
      */
     function shareRate() public view returns (uint256) {
         uint256 updateEnd_ = updateEnd;
@@ -233,7 +237,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
     event Rebase(uint256 shareRate, uint256 updateTime);
 
     /**
-     * @dev Update next share rate
+     * @dev Update share rate by static share rate
      */
     function rebaseByShareRate(uint256 nextShareRate_, uint256 updateEnd_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (nextShareRate_ < lastShareRate) revert NegativeRebaseNotAllowed();
@@ -248,8 +252,12 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
         emit Rebase(nextShareRate_, updateEnd_);
     }
 
+    /**
+     * @dev Increase share rate by APR
+     */
     function rebaseByApr(uint256 apr, uint256 updateEnd_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (updateEnd_ < block.timestamp) revert UpdateMustBeInFuture();
+        if (apr > maxAprThreshold) revert AprTooHigh();
 
         uint256 shareRateIncrease = apr * (updateEnd_ - block.timestamp) / 365 days;
         uint256 currentShareRate_ = shareRate();
@@ -272,20 +280,32 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
 
     /**
      * Fulfill IERC20 interface
-     *
+     * Token not transferable
      */
     function transferFrom(address, address, uint256) public virtual returns (bool) {
         revert TransferFromNotSupported();
     }
 
+    /**
+     * Fulfill IERC20 interface
+     * Token not transferable
+     */
     function transfer(address, uint256) public virtual returns (bool) {
         revert TransferNotSupported();
     }
 
+    /**
+     * Fulfill IERC20 interface
+     * Token not transferable
+     */
     function allowance(address, address) public view virtual returns (uint256) {
         return 0;
     }
 
+    /**
+     * Fulfill IERC20 interface
+     * Token not transferable
+     */
     function approve(address, uint256) public virtual returns (bool) {
         revert ApprovalsNotSupported();
     }
