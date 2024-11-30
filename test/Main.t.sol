@@ -148,17 +148,31 @@ contract LockTest is Test {
         fstmove.transfer(address(2), 10);
     }
 
-    function testFail_Approve() public {
+    function test_Whitelisted() public {
         testFuzz_Deposit(100, bytes32(0));
 
-        vm.prank(address(this));
-        fstmove.approve(address(2), 10);
-    }
+        vm.expectRevert();
+        fstmove.approve(address(123), 100);
 
-    function testFail_TransferFrom() public {
-        testFuzz_Deposit(100, bytes32(0));
+        vm.expectRevert();
+        fstmove.transferFrom(address(this), address(123), 100);
 
-        vm.prank(address(this));
-        fstmove.transferFrom(address(this), address(2), 10);
+        fstmove.whitelist(address(123));
+
+        fstmove.approve(address(123), 100);
+
+        vm.prank(address(123));
+        fstmove.transferFrom(address(this), address(123), 100);
+
+        assertEq(fstmove.balanceOf(address(this)), 0);
+        assertEq(fstmove.balanceOf(address(123)), 100);
+
+        fstmove.blacklist(address(123));
+
+        vm.expectRevert();
+        fstmove.approve(address(123), 100);
+
+        vm.expectRevert();
+        fstmove.transferFrom(address(this), address(123), 100);
     }
 }

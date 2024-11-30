@@ -7,7 +7,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {AccessControlDefaultAdminRulesUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
-import "forge-std/console.sol";
 
 /**
  * @dev Non-transferable and rebasing read-only ERC20 token
@@ -16,13 +15,13 @@ import "forge-std/console.sol";
  *
  * This contract has the ability to mint users a placeholder ERC20 token (that is read-only; non-transferable; non-approval; non-burnable) representing their deposit from the Lock contract.
  * In order to increase user balances to reflect depositer APY, there is a share rate that is linearly increased to reach a target threshold at a certain time.
- *
- * The ability to rebase this contract or change the share rate to a different function is permissioned to the _gov address, defined when the contract is deployed.
  */
 contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAdminRulesUpgradeable {
     bytes32 public constant LOCK_ROLE = keccak256("LOCK_ROLE");
 
     mapping(address account => uint256) private _shares;
+    mapping(address account => mapping(address spender => uint256)) private _allowances;
+    mapping(address account => bool) private _whitelisted;
 
     uint256 public BASE;
 
@@ -42,11 +41,10 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
 
     bool destructed = false;
 
-    error TransferFromNotSupported();
     error TransferNotSupported();
-    error ApprovalsNotSupported();
     error NegativeRebaseNotAllowed();
     error UpdateMustBeInFuture();
+    error NotWhitelisted();
     error AprTooHigh();
 
     /**
@@ -279,11 +277,142 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
     }
 
     /**
-     * Fulfill IERC20 interface
-     * Token not transferable
+     * @dev See {IERC20-approve}.
+     *
+     * NOTE: If `value` is the maximum `uint256`, the allowance is not updated on
+     * `transferFrom`. This is semantically equivalent to an infinite approval.
+     *
+     * Requirements:
+     *
+     * - `spender` cannot be the zero address.
      */
-    function transferFrom(address, address, uint256) public virtual returns (bool) {
-        revert TransferFromNotSupported();
+    function approve(address spender, uint256 value) public virtual returns (bool) {
+        if (!_whitelisted[spender]) {
+            revert NotWhitelisted();
+        }
+
+        address owner = _msgSender();
+        _approve(owner, spender, value);
+        return true;
+    }
+
+    /**
+     * @dev Sets `value` as the allowance of `spender` over the `owner` s tokens.
+     *
+     * This internal function is equivalent to `approve`, and can be used to
+     * e.g. set automatic allowances for certain subsystems, etc.
+     *
+     * Emits an {Approval} event.
+     *
+     * Requirements:
+     *
+     * - `owner` cannot be the zero address.
+     * - `spender` cannot be the zero address.
+     *
+     * Overrides to this logic should be done to the variant with an additional `bool emitEvent` argument.
+     */
+    function _approve(address owner, address spender, uint256 value) internal {
+        _approve(owner, spender, value, true);
+    }
+
+    /**
+     * @dev Variant of {_approve} with an optional flag to enable or disable the {Approval} event.
+     *
+     * By default (when calling {_approve}) the flag is set to true. On the other hand, approval changes made by
+     * `_spendAllowance` during the `transferFrom` operation set the flag to false. This saves gas by not emitting any
+     * `Approval` event during `transferFrom` operations.
+     *
+     * Anyone who wishes to continue emitting `Approval` events on the`transferFrom` operation can force the flag to
+     * true using the following override:
+     *
+     * Requirements are the same as {_approve}.
+     */
+    function _approve(address owner, address spender, uint256 value, bool emitEvent) internal virtual {
+        if (owner == address(0)) {
+            revert ERC20InvalidApprover(address(0));
+        }
+        if (spender == address(0)) {
+            revert ERC20InvalidSpender(address(0));
+        }
+        _allowances[owner][spender] = value;
+        if (emitEvent) {
+            emit Approval(owner, spender, value);
+        }
+    }
+
+    /**
+     * @dev Updates `owner` s allowance for `spender` based on spent `value`.
+     *
+     * Does not update the allowance value in case of infinite allowance.
+     * Revert if not enough allowance is available.
+     *
+     * Does not emit an {Approval} event.
+     */
+    function _spendAllowance(address owner, address spender, uint256 value) internal virtual {
+        uint256 currentAllowance = allowance(owner, spender);
+
+        if (currentAllowance < type(uint256).max) {
+            if (currentAllowance < value) {
+                revert ERC20InsufficientAllowance(spender, currentAllowance, value);
+            }
+            unchecked {
+                _approve(owner, spender, currentAllowance - value, false);
+            }
+        }
+    }
+
+    /**
+     * @dev Moves a `value` amount of tokens from `from` to `to`.
+     *
+     * This internal function is equivalent to {transfer}, and can be used to
+     * e.g. implement automatic token fees, slashing mechanisms, etc.
+     *
+     * Emits a {Transfer} event.
+     *
+     * NOTE: This function is not virtual, {_update} should be overridden instead.
+     */
+    function _transfer(address from, address to, uint256 value) internal {
+        if (from == address(0)) {
+            revert ERC20InvalidSender(address(0));
+        }
+        if (to == address(0)) {
+            revert ERC20InvalidReceiver(address(0));
+        }
+        _update(from, to, value);
+    }
+
+    /**
+     * @dev See {IERC20-transferFrom}.
+     *
+     * Skips emitting an {Approval} event indicating an allowance update. This is not
+     * required by the ERC. See {xref-ERC20-_approve-address-address-uint256-bool-}[_approve].
+     *
+     * NOTE: Does not update the allowance if the current allowance
+     * is the maximum `uint256`.
+     *
+     * Requirements:
+     *
+     * - `from` and `to` cannot be the zero address.
+     * - `from` must have a balance of at least `value`.
+     * - the caller must have allowance for ``from``'s tokens of at least
+     * `value`.
+     */
+    function transferFrom(address from, address to, uint256 value) public virtual returns (bool) {
+        if (!_whitelisted[to]) {
+            revert NotWhitelisted();
+        }
+
+        address spender = _msgSender();
+        _spendAllowance(from, spender, value);
+        _transfer(from, to, value);
+        return true;
+    }
+
+    /**
+     * @dev See {IERC20-allowance}.
+     */
+    function allowance(address owner, address spender) public view virtual returns (uint256) {
+        return _allowances[owner][spender];
     }
 
     /**
@@ -295,18 +424,23 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
     }
 
     /**
-     * Fulfill IERC20 interface
-     * Token not transferable
+     * @dev whitelist a recipient that tokens can be transferred to
      */
-    function allowance(address, address) public view virtual returns (uint256) {
-        return 0;
+    function whitelist(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _whitelisted[recipient] = true;
     }
 
     /**
-     * Fulfill IERC20 interface
-     * Token not transferable
+     * @dev blacklist a recipient
      */
-    function approve(address, uint256) public virtual returns (bool) {
-        revert ApprovalsNotSupported();
+    function blacklist(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _whitelisted[recipient] = false;
+    }
+
+    /**
+     * @dev See if an address is whitelisted
+     */
+    function whitelisted(address recipient) public view virtual returns (bool) {
+        return _whitelisted[recipient];
     }
 }
