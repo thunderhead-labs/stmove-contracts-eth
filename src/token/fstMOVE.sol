@@ -394,7 +394,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
      *
      * - `from` and `to` cannot be the zero address.
      * - `from` must have a balance of at least `value`.
-     * - the caller must have allowance for ``from``'s tokens of at least
+     * - the caller must have allowance for ``from``s tokens of at least
      * `value`.
      */
     function transferFrom(address from, address to, uint256 value) public virtual returns (bool) {
@@ -442,5 +442,27 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
      */
     function whitelisted(address recipient) public view virtual returns (bool) {
         return _whitelisted[recipient];
+    }
+
+    /**
+     * @dev Destroys a `value` amount of tokens from `account`, lowering the total supply.
+     * Relies on the `_update` mechanism.
+     *
+     * Emits a {Transfer} event with `to` set to the zero address.
+     *
+     * NOTE: This function is not virtual, {_update} should be overridden instead
+     */
+    function _burn(address account, uint256 value) internal {
+        if (account == address(0)) {
+            revert ERC20InvalidSender(address(0));
+        }
+        _update(account, address(0), value);
+    }
+
+    /**
+     * @dev burn the share equivalent of tokens
+     */
+    function burnAssets(address account, uint256 tokens) external onlyRole(LOCK_ROLE) {
+        _burn(account, assetsToShares(tokens));
     }
 }

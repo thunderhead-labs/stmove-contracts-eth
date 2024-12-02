@@ -23,6 +23,7 @@ contract Lock is Initializable, OwnableUpgradeable {
     IERC20 public move;
     NativeBridge public movementBridge;
     bool public frozen;
+    bool public redemptions;
 
     /**
      * @dev ledger of deposits for different move address (movement l2 address -> future stmove balance)
@@ -33,6 +34,7 @@ contract Lock is Initializable, OwnableUpgradeable {
     event Redesignation(bytes32 oldAddress, bytes32 newAddress);
 
     error LockPeriodEnded();
+    error InvalidRedemptionPeriod();
 
     constructor() {
         _disableInitializers();
@@ -100,5 +102,24 @@ contract Lock is Initializable, OwnableUpgradeable {
 
     function setMoveBridge(address bridge_) public onlyOwner {
         movementBridge = NativeBridge(bridge_);
+    }
+
+    /**
+     * @dev set redemptions
+     */
+    function setRedemptions(bool x) public onlyOwner {
+        redemptions = x;
+    }
+
+    /**
+     * @dev redeem fstMOVE for its corresponding amount of move
+     */
+    function redeem(address to, uint256 amount) public {
+        if (!redemptions) {
+            revert InvalidRedemptionPeriod();
+        }
+
+        fstmove.burnAssets(msg.sender, amount);
+        move.transfer(to, fstmove.sharesToAssets(fstmove.assetsToShares(amount))); // must do this weird function inverse composition to avoid rounding problems
     }
 }

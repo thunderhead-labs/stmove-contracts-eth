@@ -175,4 +175,21 @@ contract LockTest is Test {
         vm.expectRevert();
         fstmove.transferFrom(address(this), address(123), 100);
     }
+
+    function testFuzz_Redeem() public {
+        testFuzz_RebaseAndDeposit(100, 2 * 10 ** 8, 100, 200);
+
+        uint256 balance = fstmove.balanceOf(address(this));
+
+        vm.expectRevert();
+        lock.redeem(address(1), balance);
+
+        lock.setRedemptions(true);
+
+        lock.redeem(address(1), balance);
+
+        assertApproxEqAbs(fstmove.balanceOf(address(this)), 0, 1, "wrong fstmove balance");
+        assertApproxEqAbs(fstmove.totalSupply(), 0, 1, "wrong total supply");
+        assertApproxEqAbs(move.balanceOf(address(1)), balance, 1, "did not receive move");
+    }
 }
