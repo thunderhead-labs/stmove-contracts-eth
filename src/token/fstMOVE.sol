@@ -238,7 +238,7 @@ contract fstMOVE is IERC20, IERC20Metadata, IERC20Errors, AccessControlDefaultAd
      * @dev Update share rate by static share rate
      */
     function rebaseByShareRate(uint256 nextShareRate_, uint256 updateEnd_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (nextShareRate_ < lastShareRate) revert NegativeRebaseNotAllowed();
+        if (nextShareRate_ < shareRate()) revert NegativeRebaseNotAllowed();
         if (updateEnd_ < block.timestamp) revert UpdateMustBeInFuture();
 
         lastShareRate = shareRate();
